@@ -1,0 +1,168 @@
+{
+	"info": {
+		"_postman_id": "b3e34b8c-52bb-4d7a-b50a-e24c6c0e0b3c",
+		"name": "E-Commerce Saga Microservices (Manual)",
+		"description": "Postman collection to manually hit and test Happy Path and Sad Path scenarios for Saga Choreography.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Products",
+			"item": [
+				{
+					"name": "Create Product",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Gaming Laptop\",\n  \"description\": \"High performance gaming laptop with 16GB RAM and RTX 4060\",\n  \"stock\": 10\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/products",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Products",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/products",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Orders",
+			"item": [
+				{
+					"name": "Create Order (Scenario 1 - Happy Path)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"total_amount\": 1500,\n  \"details\": [\n    {\n      \"product_id\": \"64e4fa7d-7f64-4fa1-861b-915a1e66037c\",\n      \"amount\": 2\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/orders",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"orders"
+							]
+						},
+						"description": "Total amount is 1500 (<= 5000 limit) and stock is sufficient. Payment succeeds, order status becomes SUCCESS, and product stock is decremented."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Order (Scenario 2 - Insufficient Stock)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"total_amount\": 15000,\n  \"details\": [\n    {\n      \"product_id\": \"64e4fa7d-7f64-4fa1-861b-915a1e66037c\",\n      \"amount\": 20\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/orders",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"orders"
+							]
+						},
+						"description": "Order amount (20) exceeds the available stock. Product Service publishes StockReservationFailed, and Order Service sets status to FAILED."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Order (Scenario 3 - Payment Fails)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"total_amount\": 6000,\n  \"details\": [\n    {\n      \"product_id\": \"64e4fa7d-7f64-4fa1-861b-915a1e66037c\",\n      \"amount\": 1\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/orders",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"orders"
+							]
+						},
+						"description": "Total amount is 6000 (> 5000 limit). Payment fails, triggering compensations to restore the temporarily reserved product stock and set the order status to FAILED."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Orders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/orders",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"orders"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		}
+	]
+}

@@ -1,0 +1,508 @@
+{
+	"info": {
+		"_postman_id": "c1a82f34-ef88-46ba-a10c-f37b6c7a109a",
+		"name": "E-Commerce Saga Microservices (Automated)",
+		"description": "Postman collection containing automated tests for the E-Commerce Saga pattern, including stock check, payment verification, and compensating transactions.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "0. Setup Product",
+			"item": [
+				{
+					"name": "Create Test Product",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Product successfully created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.product_id).to.be.a(\"string\");",
+									"    pm.expect(jsonData.stock).to.eql(10);",
+									"    pm.collectionVariables.set(\"test_product_id\", jsonData.product_id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Automated Test Laptop\",\n  \"description\": \"Product created for automated saga testing\",\n  \"stock\": 10\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/products",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Products List",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/products",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Scenario 1 - Happy Path",
+			"item": [
+				{
+					"name": "1. Create Order (Happy Path)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Order created - Status is PENDING\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql(\"PENDING\");",
+									"    pm.collectionVariables.set(\"happy_path_order_id\", jsonData.order_id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"total_amount\": 1500,\n  \"details\": [\n    {\n      \"product_id\": \"{{test_product_id}}\",\n      \"amount\": 2\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/orders",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"orders"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2. Verify Success (Happy Path)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Wait 2 seconds for RabbitMQ saga events to finish processing",
+									"const delay = 2000;",
+									"const start = Date.now();",
+									"while (Date.now() - start < delay) {}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Order status transitioned to SUCCESS\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var orders = pm.response.json();",
+									"    var orderId = pm.collectionVariables.get(\"happy_path_order_id\");",
+									"    var order = orders.find(o => o.order_id === orderId);",
+									"    ",
+									"    pm.expect(order).to.not.be.undefined;",
+									"    pm.expect(order.status).to.eql(\"SUCCESS\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/orders",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"orders"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "3. Verify Stock Decremented",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Stock is decremented by 2 (Remaining: 8)\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var products = pm.response.json();",
+									"    var productId = pm.collectionVariables.get(\"test_product_id\");",
+									"    var product = products.find(p => p.product_id === productId);",
+									"    ",
+									"    pm.expect(product).to.not.be.undefined;",
+									"    pm.expect(product.stock).to.eql(8);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/products",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Scenario 2 - Insufficient Stock",
+			"item": [
+				{
+					"name": "1. Create Order (Insufficient Stock)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Order created - Status is PENDING\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql(\"PENDING\");",
+									"    pm.collectionVariables.set(\"insufficient_stock_order_id\", jsonData.order_id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"total_amount\": 15000,\n  \"details\": [\n    {\n      \"product_id\": \"{{test_product_id}}\",\n      \"amount\": 20\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/orders",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"orders"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2. Verify Failure (Insufficient Stock)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Wait 2 seconds for RabbitMQ saga events to finish processing",
+									"const delay = 2000;",
+									"const start = Date.now();",
+									"while (Date.now() - start < delay) {}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Order status transitioned to FAILED\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var orders = pm.response.json();",
+									"    var orderId = pm.collectionVariables.get(\"insufficient_stock_order_id\");",
+									"    var order = orders.find(o => o.order_id === orderId);",
+									"    ",
+									"    pm.expect(order).to.not.be.undefined;",
+									"    pm.expect(order.status).to.eql(\"FAILED\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/orders",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"orders"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "3. Verify Stock Unchanged",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Stock remains at 8\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var products = pm.response.json();",
+									"    var productId = pm.collectionVariables.get(\"test_product_id\");",
+									"    var product = products.find(p => p.product_id === productId);",
+									"    ",
+									"    pm.expect(product).to.not.be.undefined;",
+									"    pm.expect(product.stock).to.eql(8);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/products",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Scenario 3 - Payment Fails",
+			"item": [
+				{
+					"name": "1. Create Order (Payment Fails)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Order created - Status is PENDING\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql(\"PENDING\");",
+									"    pm.collectionVariables.set(\"payment_fail_order_id\", jsonData.order_id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"total_amount\": 6000,\n  \"details\": [\n    {\n      \"product_id\": \"{{test_product_id}}\",\n      \"amount\": 1\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/orders",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"orders"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2. Verify Failure (Payment Fails)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Wait 2 seconds for RabbitMQ saga events to finish processing",
+									"const delay = 2000;",
+									"const start = Date.now();",
+									"while (Date.now() - start < delay) {}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Order status transitioned to FAILED\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var orders = pm.response.json();",
+									"    var orderId = pm.collectionVariables.get(\"payment_fail_order_id\");",
+									"    var order = orders.find(o => o.order_id === orderId);",
+									"    ",
+									"    pm.expect(order).to.not.be.undefined;",
+									"    pm.expect(order.status).to.eql(\"FAILED\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/orders",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"orders"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "3. Verify Stock Restored",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Stock is compensated/restored back to 8\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var products = pm.response.json();",
+									"    var productId = pm.collectionVariables.get(\"test_product_id\");",
+									"    var product = products.find(p => p.product_id === productId);",
+									"    ",
+									"    pm.expect(product).to.not.be.undefined;",
+									"    pm.expect(product.stock).to.eql(8);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/products",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "test_product_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "happy_path_order_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "insufficient_stock_order_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "payment_fail_order_id",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
