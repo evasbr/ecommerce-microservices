@@ -4,7 +4,7 @@ This is a microservices-based e-commerce system that implements data consistency
 
 ## Architecture
 
-```mermaid
+```
 graph TD
     Client[Client (Swagger/Postman)] -->|HTTP REST| Gateway[API Gateway]
     
